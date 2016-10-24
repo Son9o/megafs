@@ -35,7 +35,7 @@ function CreateNewMegaAcc { ##Create new Account and increment accoutn number if
 	sleep 1m 
     MegaConfirmLink=`tac $EmailDrop | grep ^http | grep -m1 confirm`
     megareg --verify ${MegaConfirmKey} ${MegaConfirmLink}
+	mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "INSERT INTO accounts (login,password,free_space) VALUES (\"${NewMegaUsername}\",\"${NewMegaPassword}\",\"53687091200\");"
 
 }
-CreateNewMegaAcc
-mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "INSERT INTO accounts (login,password,free_space) VALUES (\"${NewMegaUsername}\",\"${NewMegaPassword}\",\"53687091200\");"
+
