@@ -16,7 +16,7 @@ function RegisterAccount { ##Requests account registration and saves a confirmat
 	MegaConfirmKey=$(echo ${Response} | awk '{print $3}')
 }
 function CreateNewMegaAcc { ##Create new Account and increment accoutn number if previous is not available
-	RegisterAccount ${MegaAccNumber}	
+	RegisterAccount ${MegaAccNumber}
 	echo ${Response}|grep ERROR &>/dev/null  #act on error
 	if [[ $? == 0 ]] ;then
 		echo ${Response}|grep EEXIST 2>&1 >/dev/null ## if EEXIST error, increment until avaialble

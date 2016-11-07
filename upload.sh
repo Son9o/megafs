@@ -2,12 +2,16 @@
 source settings.sh
 source newmegaacc.sh
 
-#if [ -d ${1} ] ;then #Check if Directory
-#	echo "Cannot uplaod DIRs"
-#	exit 1
-#fi
+if [[ $# < 1 ]] ;then
+	echo "USAGE: $0 <filename>, to upload a directory specify a directory WITHOUT  an asterix(*)"
+fi
+
+if [ -d ${1} ] ;then #Check if Directory
+	AllFiles+=$(find ${1} -type f)
+	IsDir=1
+fi
 function AccountSelector {
-FileSize=$(du -b ${1} | awk '{print $1}')
+FileSize=$(du -b ${1} | awk '{print $1}' | tail -1)
 MegaUsername=$(mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "SELECT login FROM accounts WHERE free_space >= ${FileSize};" | awk 'NR == 1')
 MegaPassword=$(mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "SELECT password FROM accounts WHERE login = \"${MegaUsername}\";")
 MegaAccFreeSpaceBefore=$(mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "SELECT free_space FROM accounts WHERE login = \"${MegaUsername}\";")
@@ -19,15 +23,15 @@ function CheckIfPutExistsError {
 }
 
 function upload {
-
-RFI=1 #RemoteFolderIncrementation
 #Some Working Variables
+RFI=1 #RemoteFolderIncrementation
 PutExistErr=0
 FileRealPath=$(realpath ${1})
 DirPath=$(dirname ${FileRealPath})
 BaseName=$(basename ${1})
 BaseRemotePath=/Root
 RemotePath=${BaseRemotePath}/${RFI}
+unset SetRemotePath
 ##End of Working varaibles
 AccountSelector ${1}
 if [[ -z ${MegaUsername+x}  ]] ;then #If no account found with enough free space; do
@@ -60,7 +64,13 @@ mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "INSE
 mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "UPDATE accounts SET free_space=\"${MegaAccFreeSpaceAfter}\" WHERE login = \"${MegaUsername}\";"
 
 }
-for arg in ${BASH_ARGV[*]};do
+if [[ $IsDir = 1 ]] ;then
+	for file in ${AllFiles[*]} ;do
+		upload ${file}
+	done
+exit
+fi
+for arg in ${BASH_ARGV[*]} ;do
 	echo ${BASH_ARGV[*]}
 	upload ${arg}
 done
