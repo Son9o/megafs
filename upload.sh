@@ -21,9 +21,21 @@ function CheckIfPutExistsError {
 	echo ${PutResoult}|grep exists &>/dev/null
 	PutExistErr=$?
 }
-
+function CheckIfChecksumExists {
+	FileHash=$(sha1sum ${1} | awk '{print $1}')
+	Sha1Lookup=$(mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "SELECT sha1sum FROM files WHERE sha1sum = \"${FileHash}\";" | awk 'NR == 1')
+	if [[ ${Sha1Lookup} == ${FileHash} ]] ;then
+	echo 1
+	fi
+}	
+###########################hash check return value not visibile!!!!!!!!!!
 function upload {
+if [[ $(CheckIfChecksumExists ${1}) != 0 ]] ;then
+	echo "File already uploaded, skipping. Use force switch to re-upload"
+	return 1
+fi
 #Some Working Variables
+FileHash=$(sha1sum ${1} | awk '{print $1}')
 RFI=1 #RemoteFolderIncrementation
 PutExistErr=0
 FileRealPath=$(realpath ${1})
@@ -58,11 +70,10 @@ fi
 
 ##Add Link to DB
 DownloadLink=$(megals --username=${MegaUsername} --password=${MegaPassword} -e | grep -w ${SetRemotePath:-${BaseRemotePath}}/${BaseName} | awk '{print $1}' )
-mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "INSERT INTO files (path,filename,link,account) VALUES (\"${DirPath}\",\"${BaseName}\",\"${DownloadLink}\",\"${MegaUsername}\")"
+mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "INSERT INTO files (path,filename,link,account,sha1sum) VALUES (\"${DirPath}\",\"${BaseName}\",\"${DownloadLink}\",\"${MegaUsername}\",\"${FileHash}\")"
 
 ##Update Free space for account
 mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "UPDATE accounts SET free_space=\"${MegaAccFreeSpaceAfter}\" WHERE login = \"${MegaUsername}\";"
-
 }
 if [[ $IsDir = 1 ]] ;then
 	for file in ${AllFiles[*]} ;do
@@ -71,6 +82,5 @@ if [[ $IsDir = 1 ]] ;then
 exit
 fi
 for arg in ${BASH_ARGV[*]} ;do
-	echo ${BASH_ARGV[*]}
 	upload ${arg}
 done
