@@ -2,14 +2,18 @@
 source settings.sh
 source newmegaacc.sh
 
-if [[ $# < 1 ]] ;then
+if [[ $# < 1 ]] ;then # Check if argument passed
 	echo "USAGE: $0 <filename>, to upload a directory specify a directory WITHOUT  an asterix(*)"
+	exit 1
 fi
-
+if ! [[ -e ${1} ]] ;then ## check if file exists
+    echo "USAGE: $0 <filename>, to upload a directory specify a directory WITHOUT  an asterix(*)"
+	exit 1
+fi
 if [ -d ${1} ] ;then #Check if Directory
-	AllFiles+=$(find ${1} -type f)
 	IsDir=1
 fi
+
 function AccountSelector {
 FileSize=$(du -b ${1} | awk '{print $1}' | tail -1)
 MegaUsername=$(mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "SELECT login FROM accounts WHERE free_space >= ${FileSize};" | awk 'NR == 1')
@@ -25,13 +29,16 @@ function CheckIfChecksumExists {
 	FileHash=$(sha1sum ${1} | awk '{print $1}')
 	Sha1Lookup=$(mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "SELECT sha1sum FROM files WHERE sha1sum = \"${FileHash}\";" | awk 'NR == 1')
 	if [[ ${Sha1Lookup} == ${FileHash} ]] ;then
-	echo 1
+	local Return=0
 	fi
+	return ${Return}
 }	
-###########################hash check return value not visibile!!!!!!!!!!
 function upload {
-if [[ $(CheckIfChecksumExists ${1}) != 0 ]] ;then
-	echo "File already uploaded, skipping. Use force switch to re-upload"
+if CheckIfChecksumExists ${1} ;then
+	local DownloadLinkExisting=$(mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "SELECT link FROM files WHERE sha1sum = \"${MegaUsername}\";")
+	local BaseNameExisting=$(mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "SELECT filename FROM files WHERE sha1sum = \"${MegaUsername}\";")
+	local DirPathExisting=$(mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "SELECT path FROM files WHERE sha1sum = \"${MegaUsername}\";")
+	echo "File already uploaded as ${DirPathExisting}/${BaseNameExisting} with link: ${DownloadLinkExisting}"
 	return 1
 fi
 #Some Working Variables
@@ -74,8 +81,13 @@ mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "INSE
 
 ##Update Free space for account
 mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "UPDATE accounts SET free_space=\"${MegaAccFreeSpaceAfter}\" WHERE login = \"${MegaUsername}\";"
+
 }
+
+
+
 if [[ $IsDir = 1 ]] ;then
+	AllFiles+=$(find ${1} -type f) ##Pupulate ARRAY with files
 	for file in ${AllFiles[*]} ;do
 		upload ${file}
 	done
