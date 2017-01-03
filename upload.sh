@@ -30,14 +30,16 @@ function CheckIfChecksumExists {
 	Sha1Lookup=$(mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "SELECT sha1sum FROM files WHERE sha1sum = \"${FileHash}\";" | awk 'NR == 1')
 	if [[ ${Sha1Lookup} == ${FileHash} ]] ;then
 	local Return=0
+	else
+	local Return=1
 	fi
 	return ${Return}
 }	
 function upload {
 if CheckIfChecksumExists ${1} ;then
-	local DownloadLinkExisting=$(mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "SELECT link FROM files WHERE sha1sum = \"${MegaUsername}\";")
-	local BaseNameExisting=$(mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "SELECT filename FROM files WHERE sha1sum = \"${MegaUsername}\";")
-	local DirPathExisting=$(mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "SELECT path FROM files WHERE sha1sum = \"${MegaUsername}\";")
+	local DownloadLinkExisting=$(mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "SELECT link FROM files WHERE sha1sum = \"${FileHash}\";")
+	local BaseNameExisting=$(mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "SELECT filename FROM files WHERE sha1sum = \"${FileHash}\";")
+	local DirPathExisting=$(mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "SELECT path FROM files WHERE sha1sum = \"${FileHash}\";")
 	echo "File already uploaded as ${DirPathExisting}/${BaseNameExisting} with link: ${DownloadLinkExisting}"
 	return 1
 fi
@@ -74,7 +76,7 @@ if [[ $? == 0 ]] ;then
 		CheckIfPutExistsError
 	done
 fi
-
+MegaAccFreeSpaceAfter="$(megadf --free --username=${MegaUsername} --password=${MegaPassword})"
 ##Add Link to DB
 DownloadLink=$(megals --username=${MegaUsername} --password=${MegaPassword} -e | grep -w ${SetRemotePath:-${BaseRemotePath}}/${BaseName} | awk '{print $1}' )
 mysql -h ${MysqlHost} -u ${MysqlUser} -p${MysqlPassword} -N ${MysqlDb} <<< "INSERT INTO files (path,filename,link,account,sha1sum) VALUES (\"${DirPath}\",\"${BaseName}\",\"${DownloadLink}\",\"${MegaUsername}\",\"${FileHash}\")"
